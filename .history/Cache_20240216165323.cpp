@@ -5,17 +5,19 @@
 #include <unordered_map>
 #include <istream>
 #include <string>
+#include <iomanip>
 
 class Cache
 {
 private:
-    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
     int sets;
     std::vector<std::vector<bool>> valid;      // Valid bit for each block in each set
     std::vector<std::vector<int>> lru_counter; // LRU counter for each block in each set
+    unsigned long hits = 0;
+    unsigned long accesses = 0;
 
 public:
     Cache(int size, int associativity, int block_size) : size(size), associativity(associativity), block_size(block_size)
@@ -41,6 +43,7 @@ public:
             {
                 // Cache hit
                 updateLRU(set_index, i);
+                hits++;
                 return true;
             }
         }
@@ -49,7 +52,19 @@ public:
         int victim_index = findLRUVictim(set_index);
         valid[set_index][victim_index] = true;
         updateLRU(set_index, victim_index);
+        accesses++;
         return false;
+    }
+
+    double getHitRate()
+    {
+        return (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    }
+
+    void resetCounters()
+    {
+        hits = 0;
+        accesses = 0;
     }
 
 private:
@@ -91,74 +106,70 @@ private:
     }
 };
 
-
-int main(int argc, char *argv[])
+void simulateCache(std::ofstream &outputFile, int size, int associativity, int block_size)
 {
-    if (argc != 2)
+    Cache cache(size, associativity, block_size);
+    cache.resetCounters();
+
+    for (int i = 0; i < 2; ++i)
     {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
+        std::ifstream inputFile("your_input_file.txt"); // Replace with your actual input file
+
+        if (!inputFile.is_open())
+        {
+            std::cerr << "Error: Unable to open file." << std::endl;
+            return;
+        }
+
+        unsigned long address;
+        while (inputFile >> std::hex >> address)
+        {
+            cache.access(address);
+        }
+
+        // Output hit rate to the file
+        double hitRate = cache.getHitRate();
+        outputFile << std::fixed << std::setprecision(4) << hitRate << ",";
+
+        cache.resetCounters();
+    }
+
+    outputFile << std::endl;
+}
+
+int main()
+{
+    // Open the output file
+    std::ofstream outputFile("solution.csv");
+
+    if (!outputFile.is_open())
+    {
+        std::cerr << "Error: Unable to open output file." << std::endl;
         return 1;
     }
 
-    const char *inputFileName = argv[1];
-    std::ifstream inputFile(inputFileName);
+    // Output CSV header to the file
+    outputFile << "size (bytes),1-way 1st loop,1-way 2nd loop,2-way 1st loop,2-way 2nd loop,4-way 1st loop,4-way 2nd loop,8-way 1st loop,8-way 2nd loop," << std::endl;
 
-    if (!inputFile.is_open())
+    // Iterate over different cache configurations
+    const int block_size = 64;
+
+    for (int size : {2048, 4096, 8192, 16384, 32768})
     {
-        std::cerr << "Error: Unable to open file " << inputFileName << std::endl;
-        return 1;
-    }
+        outputFile << size << ",";
 
-    // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
-    std::string line;
+        for (int associativity : {1, 2, 4, 8})
+        {
+            // First loop
+            simulateCache(outputFile, size, associativity, block_size);
 
-    while (std::getline(inputFile, line))
-    {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
+            // Second loop
+            simulateCache(outputFile, size, associativity, block_size);
         }
     }
 
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 64);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
-
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    // Close the output file
+    outputFile.close();
 
     return 0;
 }

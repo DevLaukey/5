@@ -1,21 +1,20 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <cmath>
-#include <unordered_map>
-#include <istream>
-#include <string>
+#include <fstream>
+#include <iomanip>
 
 class Cache
 {
 private:
-    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
     int sets;
     std::vector<std::vector<bool>> valid;      // Valid bit for each block in each set
     std::vector<std::vector<int>> lru_counter; // LRU counter for each block in each set
+    unsigned long hits = 0;
+    unsigned long accesses = 0;
 
 public:
     Cache(int size, int associativity, int block_size) : size(size), associativity(associativity), block_size(block_size)
@@ -28,11 +27,10 @@ public:
         lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
-    bool access(int address)
+    bool access(unsigned long address)
     {
         // Simulate cache behavior for the given address
         int set_index = (address / block_size) % sets;
-        int block_offset = address % block_size;
 
         // Check if the block is in the cache
         for (int i = 0; i < associativity; ++i)
@@ -41,6 +39,7 @@ public:
             {
                 // Cache hit
                 updateLRU(set_index, i);
+                hits++;
                 return true;
             }
         }
@@ -49,7 +48,19 @@ public:
         int victim_index = findLRUVictim(set_index);
         valid[set_index][victim_index] = true;
         updateLRU(set_index, victim_index);
+        accesses++;
         return false;
+    }
+
+    double getHitRate()
+    {
+        return (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    }
+
+    void resetCounters()
+    {
+        hits = 0;
+        accesses = 0;
     }
 
 private:
@@ -91,6 +102,43 @@ private:
     }
 };
 
+void simulateCache(const std::vector<bool> &isComposite, Cache &cache, std::ofstream &outputFile)
+{
+    cache.resetCounters();
+
+    const long upperBoundSquareRoot = static_cast<long>(sqrt(isComposite.size()));
+
+    for (long m = 2; m <= upperBoundSquareRoot; m++)
+    {
+        // Check for hit on read of isComposite[m]
+        if (cache.access((unsigned long)(&isComposite[m])))
+            hits++;
+        accesses++;
+
+        if (!isComposite[m])
+        {
+            for (long k = m * m; k < isComposite.size(); k += m)
+            {
+                // Check for hit on read of isComposite[k]
+                if (cache.access((unsigned long)(&isComposite[k])))
+                    hits++;
+                accesses++;
+
+                // Update isComposite[k]
+                isComposite[k] = true;
+
+                // Check for hit on write of isComposite[k]
+                if (cache.access((unsigned long)(&isComposite[k])))
+                    hits++;
+                accesses++;
+            }
+        }
+    }
+
+    // Output hit rate to the file
+    double hitRate = cache.getHitRate();
+    outputFile << std::fixed << std::setprecision(4) << hitRate << ",";
+}
 
 int main(int argc, char *argv[])
 {
@@ -109,7 +157,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Determine the upper bound dynamically based on the content of the file
+    // Read the input file to determine the upper bound dynamically
     unsigned long maxAddress = 0;
     std::string line;
 
@@ -139,26 +187,57 @@ int main(int argc, char *argv[])
     // Initialize the cache with the desired parameters
     Cache cache(256 * 1024, 8, 64);
 
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
     // Reset the file stream to the beginning of the file
     inputFile.clear();
     inputFile.seekg(0, std::ios::beg);
 
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
+    // Array to store composite flags
+    std::vector<bool> isComposite(upperBound + 1, false);
+
+    // Open output files
+    std::ofstream outputFileByAssociativity("random_by_associativity.csv");
+    std::ofstream outputFileByBlockSize("random_by_blocksize.csv");
+
+    if (!outputFileByAssociativity.is_open() || !outputFileByBlockSize.is_open())
     {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
+        std::cerr << "Error: Unable to open output files." << std::endl;
+        return 1;
     }
 
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    // Output CSV headers to the files
+    outputFileByAssociativity << "Associativity,Hit Rate," << std::endl;
+    outputFileByBlockSize << "Block Size,Hit Rate," << std::endl;
+
+    // Iterate over different associativity values
+    for (int associativity : {1, 2, 4, 8})
+    {
+        cache.resetCounters();
+
+        // First loop for associativity
+        simulateCache(isComposite, cache, outputFileByAssociativity);
+
+        // Output associativity value to the file
+        outputFileByAssociativity << associativity << std::endl;
+    }
+
+    // Iterate over different block sizes
+    for (int blockSize : {32, 64, 128})
+    {
+        cache.resetCounters();
+        cache = Cache(256 * 1024, 8, blockSize); // Update cache with new block size
+
+        // Second loop for block size
+        simulateCache(isComposite, cache, outputFileByBlockSize);
+
+        // Output block size value to the file
+        outputFileByBlockSize << blockSize << std::endl;
+    }
+
+    // Close output files
+    outputFileByAssociativity.close();
+    outputFileByBlockSize.close();
+
+    std::cout << "Simulation completed. Results saved in 'random_by_associativity.csv' and 'random_by_blocksize.csv'." << std::endl;
 
     return 0;
 }

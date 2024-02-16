@@ -91,7 +91,6 @@ private:
     }
 };
 
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -157,8 +156,8 @@ int main(int argc, char *argv[])
 
     // Output hit rate and other relevant information in a format similar to the expected output
     double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    std::cout << "size (bytes),1-way 1st loop,1-way 2nd loop,2-way 1st loop,2-way 2nd loop,4-way 1st loop,4-way 2nd loop,8-way 1st loop,8-way 2nd loop," << std::endl;
+    std::cout << cache.size << "," << hitRate << std::endl;
 
     return 0;
 }

@@ -51,6 +51,10 @@ public:
         updateLRU(set_index, victim_index);
         return false;
     }
+    int getSize() const
+    {
+        return size;
+    }
 
 private:
     void updateLRU(int set_index, int used_index)
@@ -90,7 +94,6 @@ private:
         return victim_index;
     }
 };
-
 
 int main(int argc, char *argv[])
 {
@@ -139,26 +142,15 @@ int main(int argc, char *argv[])
     // Initialize the cache with the desired parameters
     Cache cache(256 * 1024, 8, 64);
 
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
+    std::cout << "size (bytes),1-way 1st loop,1-way 2nd loop,2-way 1st loop,2-way 2nd loop,4-way 1st loop,4-way 2nd loop,8-way 1st loop,8-way 2nd loop," << std::endl;
 
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
-
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
+    // Output hit rate for the cache configuration
+    std::cout << cache.getSize() << "," << (cache.access(0) ? 1.0 : 0.0);
+    for (int i = 1; i < 8; ++i)
     {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
+        std::cout << ",0.0";
     }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    std::cout << std::endl;
 
     return 0;
 }

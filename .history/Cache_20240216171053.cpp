@@ -3,8 +3,6 @@
 #include <vector>
 #include <cmath>
 #include <unordered_map>
-#include <istream>
-#include <string>
 
 class Cache
 {
@@ -91,7 +89,6 @@ private:
     }
 };
 
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -109,42 +106,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
-    std::string line;
+    const long upperBound = /* specify the upper bound */;
+    const long upperBoundSquareRoot = static_cast<long>(std::sqrt(upperBound));
 
-    while (std::getline(inputFile, line))
-    {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
-    }
-
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
+    // Initialize the cache with the desired parameters (e.g., 256KiB cache, 8-way set associative, 64-byte block size)
     Cache cache(256 * 1024, 8, 64);
 
     unsigned long hits = 0;
     unsigned long accesses = 0;
 
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
+    std::vector<bool> isComposite(upperBound + 1, false);
 
     unsigned long address;
     while (inputFile >> std::hex >> address)
@@ -155,9 +126,9 @@ int main(int argc, char *argv[])
         accesses++;
     }
 
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    // Output hit rate and other relevant information
     std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
+    double hitRate = static_cast<double>(hits) / accesses;
     std::cout << "Hit Rate: " << hitRate << std::endl;
 
     return 0;
