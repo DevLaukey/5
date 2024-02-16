@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.ejs": "html",
+        "*.html": "html",
+        "*.pl": "prolog",
+        "*.java": "java",
+        "unordered_map": "cpp",
+        "vector": "cpp"
+    }
+}

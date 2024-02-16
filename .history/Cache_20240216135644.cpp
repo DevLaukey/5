@@ -1,10 +1,6 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
-#include <cmath>
 #include <unordered_map>
-#include <istream>
-#include <string>
 
 class Cache
 {
@@ -91,72 +87,48 @@ private:
     }
 };
 
-int main(int argc, char *argv[])
+int main()
 {
-    if (argc != 2)
-    {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
-        return 1;
-    }
+    const long upperBound = /* specify the upper bound */;
+    const long upperBoundSquareRoot = static_cast<long>(std::sqrt(upperBound));
 
-    const char *inputFileName = argv[1];
-    std::ifstream inputFile(inputFileName);
-
-    if (!inputFile.is_open())
-    {
-        std::cerr << "Error: Unable to open file " << inputFileName << std::endl;
-        return 1;
-    }
-
-    // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
-    std::string line;
-
-    while (std::getline(inputFile, line))
-    {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
-    }
-
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
+    // Initialize the cache with the desired parameters (e.g., 256KiB cache, 8-way set associative, 64-byte block size)
     Cache cache(256 * 1024, 8, 64);
 
     unsigned long hits = 0;
     unsigned long accesses = 0;
 
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
+    std::vector<bool> isComposite(upperBound + 1, false);
 
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
+    for (long m = 2; m <= upperBoundSquareRoot; m++)
     {
-        // check for hit on read or write
-        if (cache.access(address))
+        // check for hit on read of isComposite[m]
+        if (cache.access(reinterpret_cast<unsigned long>(&isComposite[m])))
             hits++;
         accesses++;
+
+        if (!isComposite[m])
+        {
+            for (long k = m * m; k <= upperBound; k += m)
+            {
+                // check for hit on read of isComposite[k]
+                if (cache.access(reinterpret_cast<unsigned long>(&isComposite[k])))
+                    hits++;
+                accesses++;
+
+                isComposite[k] = true;
+
+                // check for hit on write of isComposite[k]
+                if (cache.access(reinterpret_cast<unsigned long>(&isComposite[k])))
+                    hits++;
+                accesses++;
+            }
+        }
     }
 
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    // Output hit rate and other relevant information
     std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
+    double hitRate = static_cast<double>(hits) / accesses;
     std::cout << "Hit Rate: " << hitRate << std::endl;
 
     return 0;

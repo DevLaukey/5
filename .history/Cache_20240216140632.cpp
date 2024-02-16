@@ -109,31 +109,17 @@ int main(int argc, char *argv[])
     }
 
     // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
+    std::string maxAddress;
     std::string line;
-
     while (std::getline(inputFile, line))
     {
-        try
+        if (line.length() > maxAddress.length())
         {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
+            maxAddress = line;
         }
     }
 
-    const long upperBound = maxAddress;
+    const long upperBound = std::stoul(maxAddress, nullptr, 16);
 
     // Initialize the cache with the desired parameters
     Cache cache(256 * 1024, 8, 64);
@@ -141,9 +127,7 @@ int main(int argc, char *argv[])
     unsigned long hits = 0;
     unsigned long accesses = 0;
 
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
+    std::vector<bool> isComposite(upperBound + 1, false);
 
     unsigned long address;
     while (inputFile >> std::hex >> address)
@@ -155,7 +139,7 @@ int main(int argc, char *argv[])
     }
 
     // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    double hitRate = static_cast<double>(hits) / accesses;
     std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
     std::cout << "Hit Rate: " << hitRate << std::endl;
 

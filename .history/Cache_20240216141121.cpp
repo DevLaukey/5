@@ -90,7 +90,6 @@ private:
         return victim_index;
     }
 };
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -145,19 +144,7 @@ int main(int argc, char *argv[])
     inputFile.clear();
     inputFile.seekg(0, std::ios::beg);
 
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    // ...
 
     return 0;
 }
