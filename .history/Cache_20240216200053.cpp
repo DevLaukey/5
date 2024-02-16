@@ -51,12 +51,6 @@ public:
         updateLRU(set_index, victim_index);
         return false;
     }
-    void resetCacheState()
-    {
-        // Reset the cache state for the next run
-        valid.assign(sets, std::vector<bool>(associativity, false));
-        lru_counter.assign(sets, std::vector<int>(associativity, 0));
-    }
 
 private:
     void updateLRU(int set_index, int used_index)
@@ -142,7 +136,7 @@ int main(int argc, char *argv[])
     const long upperBound = maxAddress;
 
     // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
+    Cache cache(256 * 1024, 8, 3);
 
     unsigned long hits = 0;
     unsigned long accesses = 0;

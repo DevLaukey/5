@@ -1,15 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <cmath>
-#include <unordered_map>
-#include <istream>
-#include <string>
+#include <cstdint>
+#include <cstring>
 
 class Cache
 {
 private:
-    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
@@ -28,11 +25,10 @@ public:
         lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
-    bool access(int address)
+    bool access(uintptr_t address)
     {
         // Simulate cache behavior for the given address
         int set_index = (address / block_size) % sets;
-        int block_offset = address % block_size;
 
         // Check if the block is in the cache
         for (int i = 0; i < associativity; ++i)
@@ -50,12 +46,6 @@ public:
         valid[set_index][victim_index] = true;
         updateLRU(set_index, victim_index);
         return false;
-    }
-    void resetCacheState()
-    {
-        // Reset the cache state for the next run
-        valid.assign(sets, std::vector<bool>(associativity, false));
-        lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
 private:
@@ -96,6 +86,54 @@ private:
         return victim_index;
     }
 };
+
+void runSimulation(unsigned long upperBound)
+{
+    // Initialize the isComposite array
+    bool *isComposite = new bool[upperBound + 1];
+    std::memset(isComposite, 0, (upperBound + 1) * sizeof(bool));
+
+    // Initialize the cache with the desired parameters (256KiB, 8-way set associative, 64B block size)
+    Cache cache(256 * 1024, 8, 64);
+
+    unsigned long hits = 0;
+    unsigned long accesses = 0;
+
+    // Simulate sieve of Eratosthenes algorithm with cache access checks
+    for (long m = 2; m <= upperBound; m++)
+    {
+        // check for hit on read of isComposite[m]
+        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[m])))
+            hits++;
+        accesses++;
+
+        if (!isComposite[m])
+        {
+            for (long k = m * m; k <= upperBound; k += m)
+            {
+                // check for hit on read of isComposite[k]
+                if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                    hits++;
+                accesses++;
+
+                // check for hit on write of isComposite[k]
+                if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                    hits++;
+                accesses++;
+
+                isComposite[k] = true;
+            }
+        }
+    }
+
+    // Output hit rate and other relevant information
+    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
+    std::cout << "Hit Rate: " << hitRate << std::endl;
+
+    // Cleanup allocated memory
+    delete[] isComposite;
+}
 
 int main(int argc, char *argv[])
 {
@@ -139,31 +177,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
-
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    // Run the simulation with the determined upper bound
+    runSimulation(maxAddress);
 
     return 0;
 }

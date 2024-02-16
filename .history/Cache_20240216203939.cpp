@@ -142,28 +142,52 @@ int main(int argc, char *argv[])
     const long upperBound = maxAddress;
 
     // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
+    Cache cache(256 * 1024, 8, 64);
 
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
+    unsigned long hits1 = 0;
+    unsigned long accesses1 = 0;
 
     // Reset the file stream to the beginning of the file
     inputFile.clear();
     inputFile.seekg(0, std::ios::beg);
 
-    unsigned long address;
+    // First run through the patterns
     while (inputFile >> std::hex >> address)
     {
         // check for hit on read or write
         if (cache.access(address))
-            hits++;
-        accesses++;
+            hits1++;
+        accesses1++;
     }
 
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
+    // Output hit rate for the first run
+    double hitRate1 = (accesses1 > 0) ? static_cast<double>(hits1) / accesses1 : 0.0;
+    std::cout << "First Run - Hits: " << hits1 << ", Accesses: " << accesses1 << std::endl;
+    std::cout << "First Run - Hit Rate: " << hitRate1 << std::endl;
+
+    // Reset the cache state for the second run
+    cache.resetCacheState();
+
+    unsigned long hits2 = 0;
+    unsigned long accesses2 = 0;
+
+    // Reset the file stream to the beginning of the file again
+    inputFile.clear();
+    inputFile.seekg(0, std::ios::beg);
+
+    // Second run through the patterns
+    while (inputFile >> std::hex >> address)
+    {
+        // check for hit on read or write
+        if (cache.access(address))
+            hits2++;
+        accesses2++;
+    }
+
+    // Output hit rate for the second run
+    double hitRate2 = (accesses2 > 0) ? static_cast<double>(hits2) / accesses2 : 0.0;
+    std::cout << "Second Run - Hits: " << hits2 << ", Accesses: " << accesses2 << std::endl;
+    std::cout << "Second Run - Hit Rate: " << hitRate2 << std::endl;
 
     return 0;
 }

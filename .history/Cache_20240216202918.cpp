@@ -97,73 +97,79 @@ private:
     }
 };
 
-int main(int argc, char *argv[])
+int main()
 {
-    if (argc != 2)
+    // Define cache configurations
+    std::vector<std::tuple<int, int>> cacheConfigurations = {{2048, 1}, {2048, 2}, {4096, 1}, {4096, 2}, {8192, 1}, {8192, 2}, {16384, 1}, {16384, 2}};
+
+    // Print header
+    std::cout << "size (bytes)\t1-way 1st loop\t1-way 2nd loop\t2-way 1st loop\t2-way 2nd loop\t4-way 1st loop\t4-way 2nd loop\t8-way 1st loop\t8-way 2nd loop" << std::endl;
+
+    // Iterate through cache configurations
+    for (const auto &config : cacheConfigurations)
     {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
-        return 1;
-    }
+        int size = std::get<0>(config);
+        int associativity = std::get<1>(config);
 
-    const char *inputFileName = argv[1];
-    std::ifstream inputFile(inputFileName);
+        // Initialize the cache with the desired parameters
+        Cache cache(size, associativity, 16);
 
-    if (!inputFile.is_open())
-    {
-        std::cerr << "Error: Unable to open file " << inputFileName << std::endl;
-        return 1;
-    }
+        // Print size (bytes)
+        std::cout << size << "\t";
 
-    // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
-    std::string line;
-
-    while (std::getline(inputFile, line))
-    {
-        try
+        // Run the two loops
+        for (int run = 1; run <= 2; ++run)
         {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
+            unsigned long hits = 0;
+            unsigned long accesses = 0;
+
+            // Assuming isComposite is a boolean array
+            std::vector<char> isComposite(size + 1, false);
+
+            // Simulate cache behavior during Sieve of Eratosthenes algorithm
+            for (long m = 2; m <= size; m++)
+            {
+                // check for hit on read of isComposite[m]
+                if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[m])))
+                    hits++;
+                accesses++;
+
+                if (!isComposite[m])
+                {
+                    for (long k = m * m; k <= size; k += m)
+                    {
+                        // check for hit on read of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+
+                        // Update isComposite[k]
+                        isComposite[k] = true;
+
+                        // check for hit on write of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+                    }
+                }
+            }
+
+            // Output hit rate for the current run
+            double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+            std::cout << hitRate;
+
+            // Reset the cache state after the first run
+            if (run == 1)
+                cache.resetCacheState();
+
+            // Print tab separator
+            if (run < 2)
+                std::cout << "\t";
         }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
+
+        // Move to the next line for the next cache configuration
+        std::cout << std::endl;
     }
-
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
-
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
 
     return 0;
 }

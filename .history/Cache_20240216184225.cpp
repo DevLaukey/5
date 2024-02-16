@@ -2,9 +2,8 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
-#include <unordered_map>
-#include <istream>
-#include <string>
+#include <cstdint>
+#include <cstring>
 
 class Cache
 {
@@ -28,7 +27,7 @@ public:
         lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
-    bool access(int address)
+    bool access(uintptr_t address)
     {
         // Simulate cache behavior for the given address
         int set_index = (address / block_size) % sets;
@@ -50,12 +49,6 @@ public:
         valid[set_index][victim_index] = true;
         updateLRU(set_index, victim_index);
         return false;
-    }
-    void resetCacheState()
-    {
-        // Reset the cache state for the next run
-        valid.assign(sets, std::vector<bool>(associativity, false));
-        lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
 private:
@@ -114,56 +107,72 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Determine the upper bound dynamically based on the content of the file
-    unsigned long maxAddress = 0;
-    std::string line;
+    std::vector<std::pair<int, int>> cacheConfigurations = {
+        {1, 1}, {1, 2}, {2, 1}, {2, 2}, {4, 1}, {4, 2}, {8, 1}, {8, 2}};
 
-    while (std::getline(inputFile, line))
+    std::vector<int> sizes = {2048, 4096, 8192, 16384, 32768};
+
+    // Print header
+    std::cout << "size (bytes),1-way 1st loop,1-way 2nd loop,2-way 1st loop,2-way 2nd loop,4-way 1st loop,4-way 2nd loop,8-way 1st loop,8-way 2nd loop" << std::endl;
+
+    for (const auto &size : sizes)
     {
-        try
+        std::cout << size;
+
+        // Initialize the isComposite array
+        bool *isComposite = new bool[size + 1];
+        std::memset(isComposite, 0, (size + 1) * sizeof(bool));
+
+        for (const auto &config : cacheConfigurations)
         {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            maxAddress = std::max(maxAddress, currentAddress);
+            int associativity = config.first;
+            int block_size = config.second;
+
+            // Initialize the cache with the desired parameters
+            Cache cache(size, associativity, block_size);
+
+            unsigned long hits = 0;
+            unsigned long accesses = 0;
+
+            long upperBoundSquareRoot = static_cast<long>(std::sqrt(size));
+
+            // Simulate sieve of Eratosthenes algorithm with cache access checks
+            for (long m = 2; m <= upperBoundSquareRoot; m++)
+            {
+                // check for hit on read of isComposite[m]
+                if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[m])))
+                    hits++;
+                accesses++;
+
+                if (!isComposite[m])
+                {
+                    for (long k = m * m; k <= size; k += m)
+                    {
+                        // check for hit on read of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+
+                        isComposite[k] = true;
+
+                        // check for hit on write of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+                    }
+                }
+            }
+
+            // Output hit rate for the current configuration
+            double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+            std::cout << "," << hitRate;
         }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
+
+        // Cleanup allocated memory
+        delete[] isComposite;
+
+        std::cout << std::endl;
     }
-
-    const long upperBound = maxAddress;
-
-    // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    // Reset the file stream to the beginning of the file
-    inputFile.clear();
-    inputFile.seekg(0, std::ios::beg);
-
-    unsigned long address;
-    while (inputFile >> std::hex >> address)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information in a format similar to the expected output
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
-    std::cout << "Hit Rate: " << hitRate << std::endl;
 
     return 0;
 }

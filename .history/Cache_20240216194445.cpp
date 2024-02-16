@@ -51,12 +51,6 @@ public:
         updateLRU(set_index, victim_index);
         return false;
     }
-    void resetCacheState()
-    {
-        // Reset the cache state for the next run
-        valid.assign(sets, std::vector<bool>(associativity, false));
-        lru_counter.assign(sets, std::vector<int>(associativity, 0));
-    }
 
 private:
     void updateLRU(int set_index, int used_index)
