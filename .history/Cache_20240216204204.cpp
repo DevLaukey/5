@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     const long upperBound = maxAddress;
 
     // Initialize the cache with the desired parameters
-    Cache cache(256 * 1024, 8, 32);
+    Cache cache(256 * 1024, 8, 64);
 
     unsigned long hits1 = 0;
     unsigned long accesses1 = 0;
