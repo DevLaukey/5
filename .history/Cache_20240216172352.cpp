@@ -4,12 +4,12 @@
 #include <cmath>
 #include <unordered_map>
 #include <istream>
-#include <iomanip>
 #include <string>
 
 class Cache
 {
 private:
+    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
@@ -91,27 +91,6 @@ private:
     }
 };
 
-void runSimulation(int cacheSize, int associativity, int blockSize, const std::vector<unsigned long> &addresses, std::ostream &output)
-{
-    Cache cache(cacheSize, associativity, blockSize);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    for (const auto &address : addresses)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    output << std::setw(5) << cacheSize << "," << std::setw(5) << blockSize << "," << std::setw(5) << associativity << ",";
-    output << std::fixed << std::setprecision(4) << hitRate << std::endl;
-}
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -129,46 +108,25 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read addresses from the input file
-    std::vector<unsigned long> addresses;
-    std::string line;
+    // Initialize the cache with the desired parameters
+    Cache cache(256 * 1024, 8, 64);
 
-    while (std::getline(inputFile, line))
+    unsigned long hits = 0;
+    unsigned long accesses = 0;
+
+    unsigned long address;
+    while (inputFile >> std::hex >> address)
     {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            addresses.push_back(currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
+        // Simulate cache access for each address
+        if (cache.access(address))
+            hits++;
+        accesses++;
     }
 
-    // Output header
-    std::cout << "size (bytes),block size,associativity,hit rate" << std::endl;
-
-    // Define cache configurations
-    std::vector<std::tuple<int, int, int>> cacheConfigurations = {
-        {2048, 4, 1}, {2048, 4, 2}, {4096, 4, 2}, {8192, 8, 2}, {8192, 8, 4}, {16384, 8, 4}, {16384, 8, 8}, {32768, 16, 4}, {32768, 16, 8}, {65536, 32, 4}, {65536, 32, 8}};
-
-    // Run simulations for each cache configuration
-    for (const auto &config : cacheConfigurations)
-    {
-        int cacheSize, blockSize, associativity;
-        std::tie(cacheSize, blockSize, associativity) = config;
-
-        runSimulation(cacheSize, associativity, blockSize, addresses, std::cout);
-    }
+    // Output hit rate
+    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
+    std::cout << "Hit Rate: " << hitRate << std::endl;
 
     return 0;
 }

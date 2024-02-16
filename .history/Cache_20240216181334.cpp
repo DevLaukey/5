@@ -2,14 +2,15 @@
 #include <fstream>
 #include <vector>
 #include <cmath>
-#include <unordered_map>
+#include <cstdint>
+#include <cstring>
 #include <istream>
-#include <iomanip>
 #include <string>
 
 class Cache
 {
 private:
+    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
@@ -28,7 +29,7 @@ public:
         lru_counter.assign(sets, std::vector<int>(associativity, 0));
     }
 
-    bool access(int address)
+    bool access(uintptr_t address)
     {
         // Simulate cache behavior for the given address
         int set_index = (address / block_size) % sets;
@@ -91,27 +92,6 @@ private:
     }
 };
 
-void runSimulation(int cacheSize, int associativity, int blockSize, const std::vector<unsigned long> &addresses, std::ostream &output)
-{
-    Cache cache(cacheSize, associativity, blockSize);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    for (const auto &address : addresses)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    output << std::setw(5) << cacheSize << "," << std::setw(5) << blockSize << "," << std::setw(5) << associativity << ",";
-    output << std::fixed << std::setprecision(4) << hitRate << std::endl;
-}
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -129,8 +109,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read addresses from the input file
-    std::vector<unsigned long> addresses;
+    // Determine the upper bound dynamically based on the content of the file
+    unsigned long maxAddress = 0;
     std::string line;
 
     while (std::getline(inputFile, line))
@@ -138,7 +118,7 @@ int main(int argc, char *argv[])
         try
         {
             unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            addresses.push_back(currentAddress);
+            maxAddress = std::max(maxAddress, currentAddress);
         }
         catch (const std::invalid_argument &e)
         {
@@ -154,21 +134,77 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Output header
-    std::cout << "size (bytes),block size,associativity,hit rate" << std::endl;
+    const long upperBound = maxAddress;
 
-    // Define cache configurations
-    std::vector<std::tuple<int, int, int>> cacheConfigurations = {
-        {2048, 4, 1}, {2048, 4, 2}, {4096, 4, 2}, {8192, 8, 2}, {8192, 8, 4}, {16384, 8, 4}, {16384, 8, 8}, {32768, 16, 4}, {32768, 16, 8}, {65536, 32, 4}, {65536, 32, 8}};
+    // Cache configurations
+    std::vector<std::pair<int, int>> cacheConfigurations = {
+        {1, 1}, {1, 2}, {2, 1}, {2, 2}, {4, 1}, {4, 2}, {8, 1}, {8, 2}};
 
-    // Run simulations for each cache configuration
+    // Print header
+    std::cout << "size (bytes),";
+
     for (const auto &config : cacheConfigurations)
     {
-        int cacheSize, blockSize, associativity;
-        std::tie(cacheSize, blockSize, associativity) = config;
+        int associativity = config.first;
+        int block_size = config.second;
 
-        runSimulation(cacheSize, associativity, blockSize, addresses, std::cout);
+        std::cout << associativity << "-way " << block_size << "B 1st loop," << associativity << "-way " << block_size << "B 2nd loop,";
     }
+
+    std::cout << std::endl;
+
+    // Initialize the cache with the desired parameters
+    Cache cache(256 * 1024, 8, 64);
+
+    for (const auto &config : cacheConfigurations)
+    {
+        int associativity = config.first;
+        int block_size = config.second;
+
+        std::cout << "2048"; // Size (bytes)
+
+        cache = Cache(256 * 1024, associativity, block_size);
+
+        unsigned long hits = 0;
+        unsigned long accesses = 0;
+
+        // Reset the file stream to the beginning of the file
+        inputFile.clear();
+        inputFile.seekg(0, std::ios::beg);
+
+        unsigned long address;
+
+        // Simulate sieve of Eratosthenes algorithm with cache access checks
+        for (long m = 2; m <= upperBound; m++)
+        {
+            // check for hit on read of isComposite[m]
+            if (cache.access(reinterpret_cast<uintptr_t>(&m)))
+                hits++;
+            accesses++;
+
+            if (!isComposite(m))
+            {
+                for (long k = m * m; k <= upperBound; k += m)
+                {
+                    // check for hit on read of isComposite[k]
+                    if (cache.access(reinterpret_cast<uintptr_t>(&k)))
+                        hits++;
+                    accesses++;
+
+                    // check for hit on write of isComposite[k]
+                    if (cache.access(reinterpret_cast<uintptr_t>(&k)))
+                        hits++;
+                    accesses++;
+                }
+            }
+        }
+
+        // Output hit rate for the current configuration
+        double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+        std::cout << "," << hitRate << ",";
+    }
+
+    std::cout << std::endl;
 
     return 0;
 }

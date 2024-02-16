@@ -1,9 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <cmath>
-#include <unordered_map>
-#include <istream>
 #include <iomanip>
 #include <string>
 
@@ -18,7 +15,8 @@ private:
     std::vector<std::vector<int>> lru_counter; // LRU counter for each block in each set
 
 public:
-    Cache(int size, int associativity, int block_size) : size(size), associativity(associativity), block_size(block_size)
+    Cache(int size, int associativity, int block_size)
+        : size(size), associativity(associativity), block_size(block_size)
     {
         // Calculate the number of sets
         sets = size / (associativity * block_size);
@@ -91,32 +89,11 @@ private:
     }
 };
 
-void runSimulation(int cacheSize, int associativity, int blockSize, const std::vector<unsigned long> &addresses, std::ostream &output)
-{
-    Cache cache(cacheSize, associativity, blockSize);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    for (const auto &address : addresses)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    output << std::setw(5) << cacheSize << "," << std::setw(5) << blockSize << "," << std::setw(5) << associativity << ",";
-    output << std::fixed << std::setprecision(4) << hitRate << std::endl;
-}
-
 int main(int argc, char *argv[])
 {
-    if (argc != 2)
+    if (argc != 5)
     {
-        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <input_file> <cache_size> <associativity> <block_size>" << std::endl;
         return 1;
     }
 
@@ -129,8 +106,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read addresses from the input file
-    std::vector<unsigned long> addresses;
+    // Determine the upper bound dynamically based on the content of the file
+    unsigned long maxAddress = 0;
     std::string line;
 
     while (std::getline(inputFile, line))
@@ -138,7 +115,7 @@ int main(int argc, char *argv[])
         try
         {
             unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            addresses.push_back(currentAddress);
+            maxAddress = std::max(maxAddress, currentAddress);
         }
         catch (const std::invalid_argument &e)
         {
@@ -154,21 +131,38 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Output header
-    std::cout << "size (bytes),block size,associativity,hit rate" << std::endl;
+    const long upperBound = maxAddress;
 
-    // Define cache configurations
-    std::vector<std::tuple<int, int, int>> cacheConfigurations = {
-        {2048, 4, 1}, {2048, 4, 2}, {4096, 4, 2}, {8192, 8, 2}, {8192, 8, 4}, {16384, 8, 4}, {16384, 8, 8}, {32768, 16, 4}, {32768, 16, 8}, {65536, 32, 4}, {65536, 32, 8}};
+    // Parse cache parameters from command-line arguments
+    int cacheSize = std::stoi(argv[2]);
+    int associativity = std::stoi(argv[3]);
+    int blockSize = std::stoi(argv[4]);
 
-    // Run simulations for each cache configuration
-    for (const auto &config : cacheConfigurations)
+    // Initialize the cache with the specified parameters
+    Cache cache(cacheSize, associativity, blockSize);
+
+    unsigned long hits = 0;
+    unsigned long accesses = 0;
+
+    // Reset the file stream to the beginning of the file
+    inputFile.clear();
+    inputFile.seekg(0, std::ios::beg);
+
+    unsigned long address;
+    while (inputFile >> std::hex >> address)
     {
-        int cacheSize, blockSize, associativity;
-        std::tie(cacheSize, blockSize, associativity) = config;
-
-        runSimulation(cacheSize, associativity, blockSize, addresses, std::cout);
+        // Check for hit on read or write
+        if (cache.access(address))
+            hits++;
+        accesses++;
     }
+
+    // Output hit rate and other relevant information in a formatted way
+    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+    std::cout << "Cache Simulation Results:" << std::endl;
+    std::cout << "Cache Size: " << cacheSize << " bytes, Associativity: " << associativity << ", Block Size: " << blockSize << " bytes" << std::endl;
+    std::cout << "Hits: " << hits << ", Accesses: " << accesses << std::endl;
+    std::cout << "Hit Rate: " << std::fixed << std::setprecision(4) << hitRate * 100 << "%" << std::endl;
 
     return 0;
 }

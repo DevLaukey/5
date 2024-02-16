@@ -4,12 +4,14 @@
 #include <cmath>
 #include <unordered_map>
 #include <istream>
-#include <iomanip>
 #include <string>
+#include <cstring>
+#include <cstdint>
 
 class Cache
 {
 private:
+    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
@@ -91,25 +93,67 @@ private:
     }
 };
 
-void runSimulation(int cacheSize, int associativity, int blockSize, const std::vector<unsigned long> &addresses, std::ostream &output)
+void runSimulation(const std::vector<int> &sizes, const std::vector<std::pair<int, int>> &cacheConfigurations, const std::string &outputHeader)
 {
-    Cache cache(cacheSize, associativity, blockSize);
+    // Print header
+    std::cout << outputHeader << std::endl;
 
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    for (const auto &address : addresses)
+    for (const auto &size : sizes)
     {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
+        std::cout << size;
 
-    // Output hit rate and other relevant information
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    output << std::setw(5) << cacheSize << "," << std::setw(5) << blockSize << "," << std::setw(5) << associativity << ",";
-    output << std::fixed << std::setprecision(4) << hitRate << std::endl;
+        // Initialize the isComposite array
+        bool *isComposite = new bool[size + 1];
+        std::memset(isComposite, 0, (size + 1) * sizeof(bool));
+
+        for (const auto &config : cacheConfigurations)
+        {
+            int associativity = config.first;
+            int block_size = config.second;
+
+            // Initialize the cache with the desired parameters
+            Cache cache(size, associativity, block_size);
+
+            unsigned long hits = 0;
+            unsigned long accesses = 0;
+
+            // Simulate sieve of Eratosthenes algorithm with cache access checks
+            for (long m = 2; m <= size; m++)
+            {
+                // check for hit on read of isComposite[m]
+                if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[m])))
+                    hits++;
+                accesses++;
+
+                if (!isComposite[m])
+                {
+                    for (long k = m * m; k <= size; k += m)
+                    {
+                        // check for hit on read of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+
+                        isComposite[k] = true;
+
+                        // check for hit on write of isComposite[k]
+                        if (cache.access(reinterpret_cast<uintptr_t>(&isComposite[k])))
+                            hits++;
+                        accesses++;
+                    }
+                }
+            }
+
+            // Output hit rate for the current configuration
+            double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+            std::cout << "," << hitRate;
+        }
+
+        // Cleanup allocated memory
+        delete[] isComposite;
+
+        std::cout << std::endl;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -129,46 +173,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read addresses from the input file
-    std::vector<unsigned long> addresses;
-    std::string line;
+    std::vector<std::pair<int, int>> associativityConfigurations = {
+        {1, 1}, {1, 2}, {2, 1}, {2, 2}, {4, 1}, {4, 2}, {8, 1}, {8, 2}};
 
-    while (std::getline(inputFile, line))
-    {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            addresses.push_back(currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
-    }
+    std::vector<int> sizes = {2048, 4096, 8192, 16384, 32768};
 
-    // Output header
-    std::cout << "size (bytes),block size,associativity,hit rate" << std::endl;
+    runSimulation(sizes, associativityConfigurations, "size (bytes),1-way 1st loop,1-way 2nd loop,2-way 1st loop,2-way 2nd loop,4-way 1st loop,4-way 2nd loop,8-way 1st loop,8-way 2nd loop");
 
-    // Define cache configurations
-    std::vector<std::tuple<int, int, int>> cacheConfigurations = {
-        {2048, 4, 1}, {2048, 4, 2}, {4096, 4, 2}, {8192, 8, 2}, {8192, 8, 4}, {16384, 8, 4}, {16384, 8, 8}, {32768, 16, 4}, {32768, 16, 8}, {65536, 32, 4}, {65536, 32, 8}};
+    std::vector<std::pair<int, int>> blockSizeConfigurations = {
+        {1, 64}, {2, 64}, {4, 64}, {8, 64}};
 
-    // Run simulations for each cache configuration
-    for (const auto &config : cacheConfigurations)
-    {
-        int cacheSize, blockSize, associativity;
-        std::tie(cacheSize, blockSize, associativity) = config;
-
-        runSimulation(cacheSize, associativity, blockSize, addresses, std::cout);
-    }
+    runSimulation(sizes, blockSizeConfigurations, "size (bytes),64B 1st loop,64B 2nd loop,128B 1st loop,128B 2nd loop,256B 1st loop,256B 2nd loop,512B 1st loop,512B 2nd loop");
 
     return 0;
 }

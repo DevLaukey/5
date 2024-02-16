@@ -4,12 +4,12 @@
 #include <cmath>
 #include <unordered_map>
 #include <istream>
-#include <iomanip>
 #include <string>
 
 class Cache
 {
 private:
+    // Define cache parameters
     int size; // in bytes
     int associativity;
     int block_size;
@@ -91,27 +91,6 @@ private:
     }
 };
 
-void runSimulation(int cacheSize, int associativity, int blockSize, const std::vector<unsigned long> &addresses, std::ostream &output)
-{
-    Cache cache(cacheSize, associativity, blockSize);
-
-    unsigned long hits = 0;
-    unsigned long accesses = 0;
-
-    for (const auto &address : addresses)
-    {
-        // check for hit on read or write
-        if (cache.access(address))
-            hits++;
-        accesses++;
-    }
-
-    // Output hit rate and other relevant information
-    double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
-    output << std::setw(5) << cacheSize << "," << std::setw(5) << blockSize << "," << std::setw(5) << associativity << ",";
-    output << std::fixed << std::setprecision(4) << hitRate << std::endl;
-}
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -129,45 +108,38 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Read addresses from the input file
-    std::vector<unsigned long> addresses;
-    std::string line;
+    std::vector<std::pair<int, int>> cacheConfigurations = {
+        {1, 1}, {1, 2}, {2, 1}, {2, 2}, {4, 1}, {4, 2}, {8, 1}, {8, 2}};
 
-    while (std::getline(inputFile, line))
-    {
-        try
-        {
-            unsigned long currentAddress = std::stoul(line, nullptr, 16);
-            addresses.push_back(currentAddress);
-        }
-        catch (const std::invalid_argument &e)
-        {
-            // Handle invalid address (non-hexadecimal)
-            std::cerr << "Error: Invalid address in the file." << std::endl;
-            return 1;
-        }
-        catch (const std::out_of_range &e)
-        {
-            // Handle out of range address
-            std::cerr << "Error: Address out of range." << std::endl;
-            return 1;
-        }
-    }
+    std::cout << "Associativity,Block Size,Hits,Accesses,Hit Rate" << std::endl;
 
-    // Output header
-    std::cout << "size (bytes),block size,associativity,hit rate" << std::endl;
-
-    // Define cache configurations
-    std::vector<std::tuple<int, int, int>> cacheConfigurations = {
-        {2048, 4, 1}, {2048, 4, 2}, {4096, 4, 2}, {8192, 8, 2}, {8192, 8, 4}, {16384, 8, 4}, {16384, 8, 8}, {32768, 16, 4}, {32768, 16, 8}, {65536, 32, 4}, {65536, 32, 8}};
-
-    // Run simulations for each cache configuration
     for (const auto &config : cacheConfigurations)
     {
-        int cacheSize, blockSize, associativity;
-        std::tie(cacheSize, blockSize, associativity) = config;
+        int associativity = config.first;
+        int block_size = config.second;
 
-        runSimulation(cacheSize, associativity, blockSize, addresses, std::cout);
+        // Initialize the cache with the desired parameters
+        Cache cache(256 * 1024, associativity, block_size);
+
+        unsigned long hits = 0;
+        unsigned long accesses = 0;
+
+        // Reset the file stream to the beginning of the file
+        inputFile.clear();
+        inputFile.seekg(0, std::ios::beg);
+
+        unsigned long address;
+        while (inputFile >> std::hex >> address)
+        {
+            // Simulate cache access for each address
+            if (cache.access(address))
+                hits++;
+            accesses++;
+        }
+
+        // Output hit rate for the current configuration
+        double hitRate = (accesses > 0) ? static_cast<double>(hits) / accesses : 0.0;
+        std::cout << associativity << "," << block_size << "," << hits << "," << accesses << "," << hitRate << std::endl;
     }
 
     return 0;
