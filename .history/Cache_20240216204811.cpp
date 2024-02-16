@@ -100,9 +100,9 @@ private:
 
 int main(int argc, char *argv[])
 {
-    if (argc != 5)
+    if (argc != 2)
     {
-        std::cerr << "Usage: " << argv[0] << " <input_file> <cache_size> <associativity> <block_size>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
         return 1;
     }
 
@@ -143,11 +143,7 @@ int main(int argc, char *argv[])
     const long upperBound = maxAddress;
 
     // Initialize the cache with the desired parameters
-    int cache_size = std::stoi(argv[2]);
-    int associativity = std::stoi(argv[3]);
-    int block_size = std::stoi(argv[4]);
-
-    Cache cache(cache_size, associativity, block_size);
+    Cache cache(256 * 1024, 1, 64);
 
     unsigned long hits1 = 0;
     unsigned long accesses1 = 0;
