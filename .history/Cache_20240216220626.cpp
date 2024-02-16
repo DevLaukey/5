@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
         accesses1++;
 
 
-
+        
         // Print a startup banner
         std::cout << "SER450 - Project 5" << std::endl;
         std::cout << "Akhil Matthews" << std::endl;
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
         // Output hit rate for the first run
         double hitRate1 = (accesses1 > 0) ? static_cast<double>(hits1) / accesses1 : 0.0;
         std::cout << "First Run - Hits: " << hits1 << ", Accesses: " << accesses1 << std::endl;
-        std::cout << "First Run - Hit Rate: " << hitRate1<< std::endl;
+        std::cout << "First Run - Hit Rate: " << hitRate1 << std::endl;
 
         // Second run through the patterns without resetting the cache
         unsigned long hits2 = 0;

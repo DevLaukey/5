@@ -165,34 +165,28 @@ int main(int argc, char *argv[])
         if (cache.access(address))
             hits1++;
         accesses1++;
+    }
 
+    // Output hit rate for the first run
+    double hitRate1 = (accesses1 > 0) ? static_cast<double>(hits1) / accesses1 : 0.0;
+    std::cout << "First Run - Hits: " << hits1 << ", Accesses: " << accesses1 << std::endl;
+    std::cout << "First Run - Hit Rate: " << hitRate1 << std::endl;
 
+    // Second run through the patterns without resetting the cache
+    unsigned long hits2 = 0;
+    unsigned long accesses2 = 0;
 
-        // Print a startup banner
-        std::cout << "SER450 - Project 5" << std::endl;
-        std::cout << "Akhil Matthews" << std::endl;
-        std::cout << "--------------------------------" << std::endl;
+    // Reset the file stream to the beginning of the file again
+    inputFile.clear();
+    inputFile.seekg(0, std::ios::beg);
 
-        // Output hit rate for the first run
-        double hitRate1 = (accesses1 > 0) ? static_cast<double>(hits1) / accesses1 : 0.0;
-        std::cout << "First Run - Hits: " << hits1 << ", Accesses: " << accesses1 << std::endl;
-        std::cout << "First Run - Hit Rate: " << hitRate1<< std::endl;
-
-        // Second run through the patterns without resetting the cache
-        unsigned long hits2 = 0;
-        unsigned long accesses2 = 0;
-
-        // Reset the file stream to the beginning of the file again
-        inputFile.clear();
-        inputFile.seekg(0, std::ios::beg);
-
-        // Second run through the patterns
-        while (inputFile >> std::hex >> address && address <= upperBound) // Check against the updated upper bound
-        {
-            // check for hit on read or write
-            if (cache.access(address))
-                hits2++;
-            accesses2++;
+    // Second run through the patterns
+    while (inputFile >> std::hex >> address && address <= upperBound) // Check against the updated upper bound
+    {
+        // check for hit on read or write
+        if (cache.access(address))
+            hits2++;
+        accesses2++;
     }
 
     // Output hit rate for the second run
